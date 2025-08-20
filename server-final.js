@@ -161,6 +161,11 @@ app.post('/', async (req, res) => {
         html: '<div style="padding: 20px;">No ticket data received.</div>'
       });
     }
+    
+    // Log ticket tags for debugging
+    if (ticket.tags && ticket.tags.length > 0) {
+      console.log('Ticket tags:', ticket.tags);
+    }
 
     // Check if this is a live chat - don't show widget for chats
     // Help Scout generates subjects like "Live chat on Aug 5" for chat conversations
@@ -341,7 +346,7 @@ app.post('/', async (req, res) => {
     try {
       // Race between OpenAI and 7-second timeout
       const evaluation = await Promise.race([
-        evaluateResponse(latestResponse, conversation),
+        evaluateResponse(latestResponse, conversation, ticket),
         new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Help Scout timeout')), 7000)
         )
@@ -364,7 +369,7 @@ app.post('/', async (req, res) => {
       console.log('OpenAI taking too long, falling back to background processing...');
       
       // Start background evaluation and return processing message
-      evaluateResponse(latestResponse, conversation)
+      evaluateResponse(latestResponse, conversation, ticket)
         .then(async (evaluation) => {
           console.log('Background evaluation completed:', evaluation.overall_score);
           console.log('CACHING BACKGROUND RESULT with key:', cacheKey);
@@ -494,7 +499,7 @@ function getConversationContext(conversation) {
 }
 
 // Evaluate response using OpenAI
-async function evaluateResponse(response, conversation) {
+async function evaluateResponse(response, conversation, ticketData) {
   
   // Clean the response text by removing HTML tags
   const cleanText = response.text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -502,7 +507,47 @@ async function evaluateResponse(response, conversation) {
   // Get conversation context (previous 3-4 messages for context)
   const conversationContext = getConversationContext(conversation);
   
-  const prompt = `You are evaluating a customer support response based on these guidelines:
+  // Detect ticket type from tags and context
+  const tags = ticketData?.tags || [];
+  const isServicesTicket = tags.some(tag => 
+    ['services', 'custom-development', 'customization', 'custom-work'].some(keyword => 
+      tag.toLowerCase().includes(keyword)
+    )
+  );
+  
+  const isPresalesTicket = tags.some(tag => 
+    ['presales', 'pre-sales', 'sales'].some(keyword => 
+      tag.toLowerCase().includes(keyword)
+    )
+  ) || (ticketData?.subject && ticketData.subject.toLowerCase().includes('presales'));
+  
+  // Check if this is an investigation/troubleshooting phase
+  const isInvestigating = cleanText.includes('let me look into') || 
+                          cleanText.includes('I\'ll investigate') || 
+                          cleanText.includes('can you provide') ||
+                          cleanText.includes('could you share') ||
+                          cleanText.includes('I need to check') ||
+                          cleanText.includes('login credentials');
+  
+  // Log detected context for debugging
+  console.log('Ticket context detection:', {
+    isServicesTicket,
+    isPresalesTicket,
+    isInvestigating,
+    tags: tags.join(', ') || 'none'
+  });
+  
+  // Build context-aware prompt
+  let contextNote = '';
+  if (isServicesTicket) {
+    contextNote = `\n\nIMPORTANT: This is a SERVICES/CUSTOM DEVELOPMENT ticket. Focus on technical accuracy and professionalism rather than standard support resolution criteria. Do not penalize for different tone requirements as Services team has different communication standards.`;
+  } else if (isPresalesTicket) {
+    contextNote = `\n\nIMPORTANT: This is a PRESALES inquiry. Responses should be concise and direct. Do not penalize for brevity or lack of detailed troubleshooting. Focus on whether the response answers the customer's question about product capabilities.`;
+  } else if (isInvestigating) {
+    contextNote = `\n\nIMPORTANT: This response is in the INVESTIGATION/TROUBLESHOOTING phase. Do not penalize for "not providing a solution" - rate based on whether the investigation approach is appropriate and the right questions are being asked.`;
+  }
+  
+  const prompt = `You are evaluating a customer support response. CRITICAL: Review the entire conversation thread carefully before evaluating.${contextNote}
 
 SUPPORT TONE REQUIREMENTS:
 1. MUST start by thanking the customer
@@ -523,7 +568,12 @@ Please evaluate this response on these criteria:
 1. Tone & Empathy (follows support tone guidelines, thanks customer, polite closing)
 2. Clarity & Completeness (clear, direct answers, addresses all questions)
 3. Standard of English (grammar, spelling, natural phrasing for non-native speakers)
-4. Problem Resolution (addresses actual customer needs - distinguish between investigation/information gathering vs providing actual solutions)
+4. Problem Resolution (addresses actual customer needs appropriately for the context):
+   - If investigating: Rate based on quality of investigation approach
+   - If providing solution: Rate based on completeness of solution
+   - If presales: Rate based on whether capabilities are clearly explained
+   - DO NOT require workarounds when a working solution is provided
+   - DO NOT penalize for "no timeline" on ongoing investigations
 5. Following Structure (proper greeting, closing, correct terminology)
 
 For each category, provide:
@@ -533,11 +583,13 @@ For each category, provide:
 IMPORTANT FOR KEY IMPROVEMENTS:
 - Only suggest improvements that are actually needed
 - If the response already does something well (like good English or proper closing), don't suggest "continuing" it
-- If no meaningful improvements are needed, return an empty array
-- Workarounds should only be suggested for negative responses where something isn't possible
+- If no meaningful improvements are needed, return an empty array or state "No recommendations"
+- Workarounds should ONLY be suggested when the agent says something is IMPOSSIBLE, not for working solutions
 - Only suggest adding links if the response mentions specific features/documentation but lacks helpful links
-- For Problem Resolution scoring: Investigation/information gathering responses (asking for more details, requesting access, troubleshooting steps) should be scored based on how well they investigate, NOT whether they provide a final solution
+- For Problem Resolution scoring: Investigation/information gathering responses should be scored based on investigation quality, NOT solution provision
 - Each improvement should be a specific, actionable suggestion
+- NEVER suggest contradictory improvements (e.g., "be more concise" AND "provide more detail")
+- Consider the ticket type (Services/Presales/Support) when suggesting improvements
 
 Then provide an overall score out of 10 and specific suggestions for improvement.
 
@@ -590,7 +642,7 @@ Format as JSON with this structure:
           content: prompt
         }
       ],
-      temperature: 0.3,
+      temperature: 0.1,  // Lower temperature for more consistent evaluations
       max_tokens: 1500
     }, {
       headers: {
@@ -601,7 +653,12 @@ Format as JSON with this structure:
 
     console.log('OpenAI API call successful');
     const content = apiResponse.data.choices[0].message.content;
-    return JSON.parse(content);
+    let evaluation = JSON.parse(content);
+    
+    // Validate and fix common issues
+    evaluation = validateEvaluation(evaluation, cleanText, ticketData);
+    
+    return evaluation;
     
   } catch (error) {
     console.error('OpenAI API error:', error.response?.data || error.message);
@@ -618,6 +675,74 @@ Format as JSON with this structure:
       error: error.response?.data?.error?.message || error.message
     };
   }
+}
+
+// Validate evaluation to prevent contradictory feedback
+function validateEvaluation(evaluation, responseText, ticketData) {
+  // Check for contradictory feedback
+  const clarityFeedback = evaluation.categories?.clarity_completeness?.feedback || '';
+  const resolutionFeedback = evaluation.categories?.problem_resolution?.feedback || '';
+  
+  // Fix contradiction: "be more concise" vs "provide more detail"
+  if (clarityFeedback.toLowerCase().includes('concise') && 
+      resolutionFeedback.toLowerCase().includes('more detail')) {
+    console.log('Fixed contradictory feedback: concise vs detail');
+    // Keep the clarity feedback, adjust the resolution feedback
+    evaluation.categories.problem_resolution.feedback = 
+      evaluation.categories.problem_resolution.feedback.replace(/more detail[^.]*/, 'appropriate level of detail');
+  }
+  
+  // Fix: Don't penalize for missing workarounds when solution is provided
+  const hasProvidedSolution = responseText.includes('you can') || 
+                              responseText.includes('here\'s how') || 
+                              responseText.includes('this will') ||
+                              responseText.includes('follow these steps');
+  
+  if (hasProvidedSolution && resolutionFeedback.toLowerCase().includes('workaround')) {
+    console.log('Fixed: Removed workaround request when solution was provided');
+    evaluation.categories.problem_resolution.score = Math.max(
+      evaluation.categories.problem_resolution.score, 8
+    );
+    evaluation.categories.problem_resolution.feedback = 
+      evaluation.categories.problem_resolution.feedback.replace(/[^.]*workaround[^.]*\./gi, '');
+  }
+  
+  // Fix: Don't penalize Services team tickets for support criteria
+  const tags = ticketData?.tags || [];
+  const isServicesTicket = tags.some(tag => 
+    ['services', 'custom-development'].some(keyword => 
+      tag.toLowerCase().includes(keyword)
+    )
+  );
+  
+  if (isServicesTicket) {
+    // Services tickets should not be penalized for tone requirements
+    if (evaluation.categories?.tone_empathy?.score < 7) {
+      console.log('Adjusted tone score for Services ticket');
+      evaluation.categories.tone_empathy.score = Math.max(
+        evaluation.categories.tone_empathy.score, 7
+      );
+      evaluation.categories.tone_empathy.feedback = 'Services team communication - standard tone requirements adjusted';
+    }
+  }
+  
+  // Clean up improvements list
+  if (evaluation.key_improvements && Array.isArray(evaluation.key_improvements)) {
+    // Remove generic or contradictory improvements
+    evaluation.key_improvements = evaluation.key_improvements.filter(imp => {
+      if (!imp || imp.length < 5) return false;
+      if (imp.toLowerCase().includes('continue') && imp.toLowerCase().includes('good')) return false;
+      if (imp.toLowerCase() === 'no recommendations') return false;
+      return true;
+    });
+    
+    // If no real improvements left, set to proper message
+    if (evaluation.key_improvements.length === 0) {
+      evaluation.key_improvements = ['No recommendations'];
+    }
+  }
+  
+  return evaluation;
 }
 
 
@@ -725,7 +850,7 @@ Provide a brief summary of patterns found.`;
           content: prompt
         }
       ],
-      temperature: 0.3,
+      temperature: 0.1,  // Lower temperature for consistent pattern analysis
       max_tokens: 200
     }, {
       headers: {
