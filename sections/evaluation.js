@@ -274,7 +274,7 @@ class EvaluationSection {
         const textVerbosity = process.env.OPENAI_TEXT_VERBOSITY || this.openaiConfig.text?.verbosity || 'medium';
         const maxOutputTokens = parseInt(process.env.OPENAI_MAX_OUTPUT_TOKENS) || this.openaiConfig.max_output_tokens || 1500;
 
-        logParams = `model: ${model}, reasoning_effort: ${reasoningEffort}, verbosity: ${textVerbosity}, max_output_tokens: ${maxOutputTokens}`;
+        logParams = `model: ${model}, reasoning_effort: ${reasoningEffort}, verbosity: ${textVerbosity}, max_tokens: ${maxOutputTokens}`;
 
         requestBody = {
           model,
@@ -290,7 +290,7 @@ class EvaluationSection {
           ],
           reasoning_effort: reasoningEffort,
           verbosity: textVerbosity,
-          max_output_tokens: maxOutputTokens,
+          max_tokens: maxOutputTokens,
           response_format: evaluationResponseFormat
         };
       } else {
