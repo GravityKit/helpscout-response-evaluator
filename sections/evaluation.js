@@ -335,9 +335,10 @@ class EvaluationSection {
 
       let evaluation;
       if (isGPT5) {
-        // GPT-5 with Structured Outputs - guaranteed schema adherence
-        evaluation = apiResponse.data.choices[0].message.parsed;
-        console.log('Using GPT-5 Structured Outputs - no validation needed');
+        // GPT-5 with json_object format - parse JSON manually
+        const content = apiResponse.data.choices[0].message.content;
+        evaluation = JSON.parse(content);
+        console.log('Using GPT-5 json_object format - parsed response');
       } else {
         // GPT-4 - parse JSON manually
         const content = apiResponse.data.choices[0].message.content;
