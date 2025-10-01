@@ -11,7 +11,7 @@ const crypto = require('crypto');
 
 // Simulate Help Scout request
 function generateSignature(body, secret) {
-  const hmac = crypto.createHmac('sha256', secret);
+  const hmac = crypto.createHmac('sha1', secret);
   hmac.update(JSON.stringify(body));
   return hmac.digest('base64');
 }

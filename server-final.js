@@ -183,8 +183,8 @@ function validateHelpScoutSignature(req) {
     const crypto = require('crypto');
     const rawBody = req.rawBody || '';
 
-    // Compute HMAC-SHA256 signature
-    const hmac = crypto.createHmac('sha256', secret);
+    // Compute HMAC-SHA1 signature (as per Help Scout documentation)
+    const hmac = crypto.createHmac('sha1', secret);
     hmac.update(rawBody);
     const computedSignature = hmac.digest('base64');
 
