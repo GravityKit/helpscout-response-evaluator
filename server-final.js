@@ -136,7 +136,12 @@ async function saveEvaluation(ticketData, agentName, customerName, responseText,
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+// Capture raw body for signature validation before JSON parsing
+app.use(express.json({
+  verify: (req, res, buf, encoding) => {
+    req.rawBody = buf.toString('utf8');
+  }
+}));
 app.use(express.urlencoded({ extended: true }));
 
 // Helper function to escape HTML content safely
@@ -150,10 +155,88 @@ function escapeHtml(text) {
     .replace(/'/g, '&#39;');
 }
 
+// Validate Help Scout webhook signature
+function validateHelpScoutSignature(req) {
+  // Allow disabling validation for local development
+  if (process.env.DISABLE_SIGNATURE_VALIDATION === 'true') {
+    console.warn('⚠️  WARNING: Signature validation is DISABLED - not for production use');
+    return true;
+  }
+
+  const signature = req.headers['x-helpscout-signature'];
+  // Use new variable name with backward compatibility
+  const secret = process.env.HELPSCOUT_DYNAMIC_WIDGET_SECRET_KEY || process.env.HELPSCOUT_APP_SECRET;
+
+  // Fail-secure: reject if secret not configured
+  if (!secret) {
+    console.error('🚨 HELPSCOUT_DYNAMIC_WIDGET_SECRET_KEY not configured - rejecting request');
+    return false;
+  }
+
+  // Reject if signature header missing
+  if (!signature) {
+    console.error('🚨 X-HelpScout-Signature header missing');
+    return false;
+  }
+
+  try {
+    const crypto = require('crypto');
+    const rawBody = req.rawBody || '';
+
+    // Compute HMAC-SHA256 signature
+    const hmac = crypto.createHmac('sha256', secret);
+    hmac.update(rawBody);
+    const computedSignature = hmac.digest('base64');
+
+    // Timing-safe comparison to prevent timing attacks
+    const signatureBuffer = Buffer.from(signature);
+    const computedBuffer = Buffer.from(computedSignature);
+
+    // Buffers must be same length for timingSafeEqual
+    if (signatureBuffer.length !== computedBuffer.length) {
+      console.error('🚨 Signature validation failed: length mismatch');
+      console.error(`   Received: ${signature.substring(0, 10)}... (length: ${signatureBuffer.length})`);
+      console.error(`   Computed: ${computedSignature.substring(0, 10)}... (length: ${computedBuffer.length})`);
+      return false;
+    }
+
+    const isValid = crypto.timingSafeEqual(signatureBuffer, computedBuffer);
+
+    if (!isValid) {
+      console.error('🚨 Signature validation failed: signature mismatch');
+      console.error(`   Source IP: ${req.ip || 'unknown'}`);
+      console.error(`   Received signature: ${signature.substring(0, 10)}...`);
+      console.error(`   Computed signature: ${computedSignature.substring(0, 10)}...`);
+    } else {
+      console.log('✅ Signature validation passed');
+    }
+
+    return isValid;
+
+  } catch (error) {
+    console.error('🚨 Signature validation error:', error.message);
+    return false;
+  }
+}
+
 // Help Scout dynamic app endpoint
 app.post('/', async (req, res) => {
   try {
     console.log('=== Help Scout Request ===');
+
+    // Validate Help Scout signature
+    if (!validateHelpScoutSignature(req)) {
+      console.error('🚨 Unauthorized request - signature validation failed');
+      return res.status(401).json({
+        html: `
+          <div style="font-family: Arial, sans-serif; padding: 16px; color: #c30; border: 2px solid #c30; border-radius: 4px;">
+            <h3 style="margin: 0 0 8px 0;">🚨 Unauthorized Request</h3>
+            <p style="margin: 0; font-size: 12px;">Signature validation failed. Please check your Help Scout app configuration.</p>
+          </div>
+        `
+      });
+    }
+
     const { ticket, customer, user, mailbox } = req.body;
     
     if (!ticket || !ticket.id) {

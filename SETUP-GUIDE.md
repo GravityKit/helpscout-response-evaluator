@@ -65,7 +65,8 @@ To access Help Scout's API, you need to create an OAuth2 application:
    # Set your environment variables (use your NEW OpenAI key)
    flyctl secrets set OPENAI_API_KEY="your-new-openai-key-here"
    flyctl secrets set HELPSCOUT_ACCESS_TOKEN="your-helpscout-token-here"
-   
+   flyctl secrets set HELPSCOUT_DYNAMIC_WIDGET_SECRET_KEY="your-helpscout-widget-secret-key-here"
+
    # Deploy the app
    flyctl deploy
    ```
@@ -105,6 +106,24 @@ To access Help Scout's API, you need to create an OAuth2 application:
 2. **Check for Shopify Detection**:
    - Test with a ticket tagged "Shopify" - should say "app"
    - Test with a WordPress ticket - should say "plugin"
+
+## 🔒 Security: Signature Validation
+
+The app validates all incoming Help Scout webhooks using HMAC-SHA256 signature verification to prevent unauthorized requests.
+
+**Required for Production:**
+- `HELPSCOUT_DYNAMIC_WIDGET_SECRET_KEY` must be set in Fly.io secrets (get this from your Help Scout app settings)
+- All requests without valid signatures are rejected with 401 Unauthorized
+
+**Local Development:**
+If you need to test locally without valid Help Scout signatures, you can temporarily disable validation:
+
+```bash
+# In your .env file (DO NOT use in production!)
+DISABLE_SIGNATURE_VALIDATION=true
+```
+
+⚠️ **WARNING**: Never deploy with signature validation disabled. This would allow anyone to make unauthorized requests to your app.
 
 ## 🔧 Troubleshooting
 
