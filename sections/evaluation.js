@@ -319,6 +319,7 @@ class EvaluationSection {
 
       console.log('Making OpenAI API call...');
       console.log('Using', logParams);
+      console.log('Request body:', JSON.stringify(requestBody, null, 2));
 
       const apiResponse = await axios.post('https://api.openai.com/v1/chat/completions', requestBody, {
         headers: {
@@ -329,6 +330,8 @@ class EvaluationSection {
       });
 
       console.log('OpenAI API call successful');
+      console.log('Response status:', apiResponse.status);
+      console.log('Response data:', JSON.stringify(apiResponse.data, null, 2));
 
       let evaluation;
       if (isGPT5) {
@@ -348,7 +351,13 @@ class EvaluationSection {
       return evaluation;
 
     } catch (error) {
-      console.error('OpenAI API error:', error.response?.data || error.message);
+      console.error('OpenAI API error details:');
+      console.error('Error message:', error.message);
+      console.error('Error code:', error.code);
+      console.error('Response status:', error.response?.status);
+      console.error('Response data:', JSON.stringify(error.response?.data, null, 2));
+      console.error('Full error:', error);
+
       return {
         overall_score: 0,
         categories: {
