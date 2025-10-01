@@ -281,7 +281,7 @@ class EvaluationSection {
           messages: [
             {
               role: 'system',
-              content: 'You are an expert at evaluating customer support responses.'
+              content: 'You are an expert at evaluating customer support responses. Always respond with valid JSON only, no other text.'
             },
             {
               role: 'user',
@@ -291,7 +291,7 @@ class EvaluationSection {
           reasoning_effort: reasoningEffort,
           verbosity: textVerbosity,
           max_completion_tokens: maxOutputTokens,
-          response_format: evaluationResponseFormat
+          response_format: { type: 'json_object' }
         };
       } else {
         // GPT-4 and earlier use traditional temperature and max_tokens
