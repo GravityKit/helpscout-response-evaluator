@@ -269,12 +269,12 @@ class EvaluationSection {
       let logParams;
 
       if (isGPT5) {
-        // GPT-5 uses reasoning.effort and text.verbosity (no temperature/top_p)
+        // GPT-5 with Chat Completions API uses reasoning_effort and verbosity (not nested objects)
         const reasoningEffort = process.env.OPENAI_REASONING_EFFORT || this.openaiConfig.reasoning?.effort || 'low';
         const textVerbosity = process.env.OPENAI_TEXT_VERBOSITY || this.openaiConfig.text?.verbosity || 'medium';
         const maxOutputTokens = parseInt(process.env.OPENAI_MAX_OUTPUT_TOKENS) || this.openaiConfig.max_output_tokens || 1500;
 
-        logParams = `model: ${model}, reasoning.effort: ${reasoningEffort}, text.verbosity: ${textVerbosity}, max_output_tokens: ${maxOutputTokens}`;
+        logParams = `model: ${model}, reasoning_effort: ${reasoningEffort}, verbosity: ${textVerbosity}, max_output_tokens: ${maxOutputTokens}`;
 
         requestBody = {
           model,
@@ -288,8 +288,8 @@ class EvaluationSection {
               content: prompt
             }
           ],
-          reasoning: { effort: reasoningEffort },
-          text: { verbosity: textVerbosity },
+          reasoning_effort: reasoningEffort,
+          verbosity: textVerbosity,
           max_output_tokens: maxOutputTokens,
           response_format: evaluationResponseFormat
         };
