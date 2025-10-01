@@ -949,17 +949,6 @@ Provide a brief summary of patterns found.`;
   }
 }
 
-// Test endpoint
-app.get('/widget', (req, res) => {
-  res.send(`
-    <div style="padding: 20px; font-family: Arial, sans-serif;">
-      <h3>📊 Response Evaluator</h3>
-      <p>Complete evaluation server with OpenAI!</p>
-      <p>Time: ${new Date().toISOString()}</p>
-    </div>
-  `);
-});
-
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Help Scout Response Evaluator with Google Sheets running on 0.0.0.0:${PORT}`);
 });
