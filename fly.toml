@@ -1,10 +1,10 @@
-# fly.toml app configuration file generated for helpscout-response-evaluator on 2025-08-04T09:26:11Z
+# fly.toml app configuration file generated for helpscout-response-evaluator-zi8jjg on 2025-10-01T12:04:17Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'helpscout-response-evaluator'
-primary_region = 'cdg'
+app = 'helpscout-response-evaluator-zi8jjg'
+primary_region = 'ewr'
 
 [build]
 
