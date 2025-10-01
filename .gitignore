@@ -16,3 +16,8 @@ npm-debug.log*
 # IDE
 .vscode/
 .idea/
+
+# AI
+.claude/settings.local.json
+.serena
+.cursor
