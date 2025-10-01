@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+npm-debug.log
+
+# Environment and secrets
+.env
+.env.*
+
+# Logs
+logs/
+*.log
+
+# Test coverage
+coverage/
+
+# Version control
+.git/
+.gitignore
+
+# Documentation
+README.md
+SETUP-GUIDE.md
+
+# IDE and OS files
+.DS_Store
+.vscode/
+.idea/
+
+# Development files
+tests/
+scripts/
+jest.config.js
