@@ -1,0 +1,22 @@
+{
+  "model": "gpt-5",
+  "reasoning": {
+    "effort": "low"
+  },
+  "text": {
+    "verbosity": "medium"
+  },
+  "max_output_tokens": 1500,
+  "fallback": {
+    "model": "gpt-4o-mini",
+    "temperature": 0.1,
+    "max_tokens": 1500
+  },
+  "notes": {
+    "model": "OpenAI model to use (override with OPENAI_MODEL env var)",
+    "reasoning": "For GPT-5: effort level minimal/low/medium/high (override with OPENAI_REASONING_EFFORT env var)",
+    "text": "For GPT-5: verbosity level low/medium/high (override with OPENAI_TEXT_VERBOSITY env var)",
+    "max_output_tokens": "Maximum response length for GPT-5 (override with OPENAI_MAX_OUTPUT_TOKENS env var)",
+    "fallback_note": "Fallback uses GPT-4o-mini with traditional parameters (temperature, max_tokens)"
+  }
+}

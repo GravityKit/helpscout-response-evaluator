@@ -1,0 +1,79 @@
+{
+  "typography": {
+    "fontFamily": "Aktiv Grotesk, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif",
+    "fontSize": {
+      "base": "13px",
+      "small": "11px",
+      "large": "16px",
+      "heading": "14px"
+    },
+    "fontWeight": {
+      "normal": "400",
+      "medium": "500",
+      "bold": "700"
+    },
+    "lineHeight": {
+      "base": "1.5",
+      "tight": "1.3"
+    }
+  },
+  "colors": {
+    "text": {
+      "primary": "#2a3e52",
+      "muted": "#93a1af",
+      "blue": "#3197d6",
+      "green": "#5bb569",
+      "red": "#d64242",
+      "orange": "#f0ad4e",
+      "purple": "#9c639c"
+    },
+    "background": {
+      "white": "#ffffff",
+      "light": "#f8f9fa",
+      "lightBlue": "#f0f8ff",
+      "lightYellow": "#fff9e6",
+      "lightGreen": "#f0f8f0"
+    },
+    "border": {
+      "light": "#e6e9ec",
+      "default": "#d6dade"
+    }
+  },
+  "spacing": {
+    "xs": "4px",
+    "sm": "8px",
+    "md": "12px",
+    "lg": "16px",
+    "xl": "20px"
+  },
+  "borderRadius": {
+    "small": "3px",
+    "default": "4px"
+  },
+  "badges": {
+    "gray": {
+      "background": "#f3f5f7",
+      "color": "#6f7782"
+    },
+    "blue": {
+      "background": "#d6f0ff",
+      "color": "#3197d6"
+    },
+    "green": {
+      "background": "#e6f5e8",
+      "color": "#5bb569"
+    },
+    "red": {
+      "background": "#ffe6e6",
+      "color": "#d64242"
+    },
+    "orange": {
+      "background": "#fff5e6",
+      "color": "#f0ad4e"
+    },
+    "purple": {
+      "background": "#f5e6f5",
+      "color": "#9c639c"
+    }
+  }
+}

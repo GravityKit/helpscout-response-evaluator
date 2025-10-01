@@ -1,0 +1,16 @@
+<div style="font-family: {{fontFamily}}; padding: {{spacing16}}; max-width: 350px;">
+  <h3 style="margin: 0 0 {{spacing12}} 0; font-size: {{fontSizeHeading}}; font-weight: {{fontWeightBold}}; color: {{colorTextPrimary}};">📊 Response Evaluation</h3>
+
+  <!-- Overall Score -->
+  <div style="text-align: center; padding: {{spacing12}}; background: {{colorBgLight}}; border-radius: {{borderRadius}}; margin-bottom: {{spacing12}}; border: 1px solid {{colorBorderLight}};">
+    <strong style="font-size: {{fontSizeLarge}}; font-weight: {{fontWeightBold}}; color: {{colorTextPrimary}};">Overall Score: {{overall_score}}/10</strong>
+  </div>
+
+  <!-- Categories -->
+  <div style="margin-bottom: {{spacing12}};">
+    {{categories_html}}
+  </div>
+
+  <!-- Key Improvements -->
+  {{improvements_html}}
+</div>

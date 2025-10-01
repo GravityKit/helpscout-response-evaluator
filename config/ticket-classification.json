@@ -1,0 +1,22 @@
+{
+  "services": {
+    "keywords": ["services", "custom-development", "customization", "custom-work"],
+    "context_note": "\n\nIMPORTANT: This is a SERVICES/CUSTOM DEVELOPMENT ticket. Focus on technical accuracy and professionalism rather than standard support resolution criteria. Do not penalize for different tone requirements as Services team has different communication standards."
+  },
+  "presales": {
+    "keywords": ["presales", "pre-sales", "sales"],
+    "subject_keywords": ["presales"],
+    "context_note": "\n\nIMPORTANT: This is a PRESALES inquiry. Responses should be concise and direct. Do not penalize for brevity or lack of detailed troubleshooting. Focus on whether the response answers the customer's question about product capabilities."
+  },
+  "investigating": {
+    "phrases": [
+      "let me look into",
+      "I'll investigate",
+      "can you provide",
+      "could you share",
+      "I need to check",
+      "login credentials"
+    ],
+    "context_note": "\n\nIMPORTANT: This response is in the INVESTIGATION/TROUBLESHOOTING phase. Do not penalize for \"not providing a solution\" - rate based on whether the investigation approach is appropriate and the right questions are being asked."
+  }
+}
