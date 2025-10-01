@@ -80,4 +80,4 @@ console.log('\nTo use this with your app:');
 console.log('1. Set HELPSCOUT_DYNAMIC_WIDGET_SECRET_KEY in your environment');
 console.log('   (get this from your Help Scout app settings)');
 console.log('2. Help Scout will send X-HelpScout-Signature header');
-console.log('3. The app validates it using HMAC-SHA256\n');
+console.log('3. The app validates it using HMAC-SHA1 (per Help Scout docs)\n');
