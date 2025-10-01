@@ -62,16 +62,41 @@ To access Help Scout's API, you need to create an OAuth2 application:
    # Create Fly app (choose a unique name)
    flyctl apps create helpscout-response-evaluator-katie
    
-   # Set your environment variables (use your NEW OpenAI key)
+   # Set your environment variables
    flyctl secrets set OPENAI_API_KEY="your-new-openai-key-here"
-   flyctl secrets set HELPSCOUT_ACCESS_TOKEN="your-helpscout-token-here"
-   flyctl secrets set HELPSCOUT_DYNAMIC_WIDGET_SECRET_KEY="your-helpscout-widget-secret-key-here"
+   flyctl secrets set HELPSCOUT_DYNAMIC_WIDGET_SECRET_KEY="your-secret-from-helpscout"
+   flyctl secrets set HELPSCOUT_APP_ID="your-app-id-from-helpscout"
+   flyctl secrets set HELPSCOUT_APP_SECRET="your-app-secret-from-helpscout"
+   flyctl secrets set GOOGLE_SHEET_ID="your-google-sheet-id"
+   flyctl secrets set GOOGLE_CLIENT_EMAIL="your-service-account-email"
+   flyctl secrets set GOOGLE_PRIVATE_KEY="your-private-key"
 
    # Deploy the app
    flyctl deploy
    ```
 
-3. **Get Your App URL**:
+3. **Share Your Google Sheet** (Required for caching):
+   - Open your Google Cloud service account JSON file
+   - Find the `"client_email"` field (e.g., `your-project@project-id.iam.gserviceaccount.com`)
+   - Open your Google Sheet at `https://docs.google.com/spreadsheets/d/{GOOGLE_SHEET_ID}`
+   - Click "Share" button (top right)
+   - Add the email from your JSON file's `client_email` field
+   - Set permission: **Editor**
+   - Click "Done"
+   
+   ⚠️ **Without this**: App still works but makes duplicate OpenAI API calls (increased costs)
+
+**Where to Find These Values:**
+
+- **OPENAI_API_KEY**: Create at https://platform.openai.com/api-keys
+- **HELPSCOUT_DYNAMIC_WIDGET_SECRET_KEY**: Help Scout → Profile → Developer → My Apps → Your App → "Secret Key"
+- **HELPSCOUT_APP_ID**: Help Scout → Profile → Developer → My Apps → Your App → "App ID"
+- **HELPSCOUT_APP_SECRET**: Help Scout → Profile → Developer → My Apps → Your App → "App Secret"
+- **GOOGLE_SHEET_ID**: From your Google Sheet URL: `https://docs.google.com/spreadsheets/d/{THIS_PART}`
+- **GOOGLE_CLIENT_EMAIL**: From your service account JSON file → `"client_email"` field
+- **GOOGLE_PRIVATE_KEY**: From your service account JSON file → `"private_key"` field (entire key including `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----` lines)
+
+4. **Get Your App URL**:
    - After deployment, Fly will show you a URL like: `https://helpscout-response-evaluator-katie.fly.dev`
    - Copy this URL - you'll need it for Help Scout
 
@@ -109,13 +134,48 @@ To access Help Scout's API, you need to create an OAuth2 application:
 
 ## 🔒 Security: Signature Validation
 
-The app validates all incoming Help Scout webhooks using HMAC-SHA256 signature verification to prevent unauthorized requests.
+The app validates all incoming Help Scout webhooks using HMAC-SHA1 signature verification to prevent unauthorized requests.
+
+### How Signature Validation Works
+
+Help Scout uses HMAC-SHA1 to sign webhook requests:
+
+1. **Help Scout computes signature**: Creates HMAC-SHA1 hash of the raw request body using your secret key
+2. **Sends X-HelpScout-Signature header**: 28-character base64-encoded signature (e.g., `E6Fa3PPJBwgrJhklyA3quasHiMY=`)
+3. **App validates**: Recomputes signature and compares using timing-safe comparison
+4. **Rejects unauthorized**: Returns 401 Unauthorized if signature is missing or invalid
+
+**Important**: Help Scout uses **SHA1** (not SHA256) for Dynamic App webhooks:
+- SHA1 signatures: 28 characters (e.g., `E6Fa3PPJBwgrJhklyA3quasHiMY=`)
+- SHA256 signatures: 44 characters (used for OAuth, not webhooks)
+
+### Example Signature Calculation
+
+```javascript
+const crypto = require('crypto');
+
+const secret = 'your-secret-key';
+const body = '{"ticket":{"id":"123456"}}';
+
+const hmac = crypto.createHmac('sha1', secret);
+hmac.update(body);
+const signature = hmac.digest('base64');
+// Result: 28-character base64 string
+```
+
+### Production Setup
 
 **Required for Production:**
-- `HELPSCOUT_DYNAMIC_WIDGET_SECRET_KEY` must be set in Fly.io secrets (get this from your Help Scout app settings)
+- Set `HELPSCOUT_DYNAMIC_WIDGET_SECRET_KEY` in Fly.io secrets (get this from Help Scout app settings)
 - All requests without valid signatures are rejected with 401 Unauthorized
+- Uses timing-safe comparison (`crypto.timingSafeEqual`) to prevent timing attacks
 
-**Local Development:**
+```bash
+flyctl secrets set HELPSCOUT_DYNAMIC_WIDGET_SECRET_KEY="your-secret-here"
+```
+
+### Local Development
+
 If you need to test locally without valid Help Scout signatures, you can temporarily disable validation:
 
 ```bash
@@ -123,7 +183,116 @@ If you need to test locally without valid Help Scout signatures, you can tempora
 DISABLE_SIGNATURE_VALIDATION=true
 ```
 
+**Testing with Valid Signatures:**
+Use the included test utility to generate valid signatures:
+
+```bash
+node test-signature.js
+# Outputs example signatures for testing
+```
+
 ⚠️ **WARNING**: Never deploy with signature validation disabled. This would allow anyone to make unauthorized requests to your app.
+
+### Dynamic App Architecture
+
+**Important**: Help Scout Dynamic Apps use **server-to-server POST requests**, not client-side widgets:
+- All requests come to `POST /` endpoint with signature validation
+- `widget.html` and `widget.js` files are NOT used by Dynamic Apps
+- No public endpoints exist without validation
+
+## 📊 Google Sheets Setup (Optional but Recommended)
+
+The app caches evaluations in Google Sheets to avoid duplicate OpenAI API calls.
+
+### Setting Up Your Google Sheet
+
+**1. Create the spreadsheet** (if you haven't already) at https://sheets.google.com
+
+**2. Add the following headers in Row 1:**
+
+| A | B | C | D | E | F | G | H | I | J | K | L | M | N | O | P |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Timestamp | Conversation ID | Agent ID | Agent Name | Overall Score | Tone Score | Clarity Score | Grammar Score | Problem Solving Score | Areas for Improvement | Response Text | Ticket Number | Tone Feedback | Clarity Feedback | Grammar Feedback | Problem Solving Feedback |
+
+**Column Descriptions:**
+- **Timestamp**: When the evaluation was performed (ISO 8601 format)
+- **Conversation ID**: Help Scout conversation/ticket ID
+- **Agent ID**: Help Scout agent user ID
+- **Agent Name**: Agent's display name
+- **Overall Score**: Average of all category scores (0-10)
+- **Tone Score**: Friendliness and professionalism rating (0-10)
+- **Clarity Score**: How clear and direct the response is (0-10)
+- **Grammar Score**: Writing quality and correctness (0-10)
+- **Problem Solving Score**: Effectiveness of the solution (0-10)
+- **Areas for Improvement**: Specific feedback on what could be better
+- **Response Text**: The actual agent response (HTML format)
+- **Ticket Number**: Help Scout ticket number
+- **Tone Feedback**: Detailed explanation of tone score
+- **Clarity Feedback**: Detailed explanation of clarity score
+- **Grammar Feedback**: Detailed explanation of grammar score
+- **Problem Solving Feedback**: Detailed explanation of problem solving score
+
+**3. Format the sheet** (optional but recommended):
+- Freeze Row 1 (View → Freeze → 1 row)
+- Bold the header row
+- Enable text wrapping for feedback columns
+- Set column widths: ID columns (100px), Score columns (80px), Feedback columns (300px)
+
+### Service Account Permissions
+
+**Required**: Share your Google Sheet with your service account email (from your Google Cloud JSON file):
+
+1. **Find your service account email**: 
+   - Open your Google Cloud service account JSON file
+   - Look for the `"client_email"` field
+   - Example: `"your-project@your-project-id.iam.gserviceaccount.com"`
+   
+2. **Share the Google Sheet**:
+   - Open your Google Sheet: `https://docs.google.com/spreadsheets/d/{GOOGLE_SHEET_ID}`
+   - Click "Share" button (top right)
+   - Add the email from your JSON file (the `client_email` value)
+   - Set permission: **Editor**
+   - Click "Done"
+
+### Without Proper Permissions
+
+If the service account lacks permissions, you'll see this error in logs:
+```
+Error: The caller does not have permission
+Status: 403 Forbidden
+```
+
+**Impact**:
+- ✅ App still works correctly
+- ✅ Signature validation still functions
+- ❌ Cannot read cached evaluations
+- ❌ Cannot write new evaluations
+- ❌ Results in duplicate OpenAI API calls (increased costs)
+
+### Environment Variables
+
+```bash
+# From your Google Sheet URL
+GOOGLE_SHEET_ID=your-spreadsheet-id
+
+# From your service account JSON file's "client_email" field
+GOOGLE_CLIENT_EMAIL=your-project@your-project-id.iam.gserviceaccount.com
+
+# From your service account JSON file's "private_key" field (keep the 
+ characters)
+GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----
+...
+-----END PRIVATE KEY-----
+"
+```
+
+**How to Get Service Account Credentials:**
+1. Go to Google Cloud Console: https://console.cloud.google.com
+2. Select your project (or create one)
+3. Navigate to "IAM & Admin" → "Service Accounts"
+4. Create a service account (or select existing)
+5. Generate a JSON key
+6. Download the JSON file - it contains both `client_email` and `private_key`
 
 ## 🔧 Troubleshooting
 
@@ -134,6 +303,52 @@ DISABLE_SIGNATURE_VALIDATION=true
 **"No conversation ID found"?**
 - Help Scout might need a few minutes to propagate the integration
 - Try refreshing the ticket page
+
+**Signature Validation Failures?**
+
+*Error: "Signature validation failed: length mismatch"*
+- **Cause**: Wrong algorithm being used (SHA256 instead of SHA1)
+- **Expected**: 28-character signatures for SHA1 (e.g., `E6Fa3PPJBwgrJhklyA3quasHiMY=`)
+- **Solution**: Verify `server-final.js` uses `crypto.createHmac('sha1', secret)` not `'sha256'`
+
+*Error: "X-HelpScout-Signature header missing"*
+- **Cause**: Request not coming from Help Scout or local testing without signature
+- **Solution**: For local testing, set `DISABLE_SIGNATURE_VALIDATION=true` in `.env`
+
+*Error: "HELPSCOUT_DYNAMIC_WIDGET_SECRET_KEY not configured"*
+- **Cause**: Secret key not set in environment
+- **Solution**: `flyctl secrets set HELPSCOUT_DYNAMIC_WIDGET_SECRET_KEY="your-secret"`
+
+*401 Unauthorized Response*
+- **Cause**: Invalid signature - secret key mismatch
+- **Solution**: 
+  1. Check secret key in Help Scout app settings matches Fly.io secrets
+  2. Use `node test-signature.js` to generate valid test signatures
+  3. Check logs for signature comparison details
+
+**Testing Signature Validation Locally:**
+
+1. Get your secret from Help Scout app settings
+2. Add to `.env`:
+   ```
+   HELPSCOUT_DYNAMIC_WIDGET_SECRET_KEY=your-secret-here
+   ```
+3. Run test utility:
+   ```bash
+   node test-signature.js
+   ```
+4. Use generated signature in Postman:
+   - Method: POST
+   - URL: http://localhost:8080/
+   - Headers: `X-HelpScout-Signature: {generated-signature}`
+   - Body: Use exact JSON from test script
+
+**Google Sheets Permission Errors?**
+- Error: "The caller does not have permission"
+- **Cause**: Service account not shared with Google Sheet
+- **Solution**: Share sheet with your service account email (from `client_email` field in Google Cloud JSON file) with Editor permission
+- **How to find email**: Open your service account JSON file → look for `"client_email"` field
+- **Impact if not fixed**: App works but makes duplicate OpenAI API calls (higher costs)
 
 **OpenAI API Errors?**
 - Ensure your new API key is valid and has credits
