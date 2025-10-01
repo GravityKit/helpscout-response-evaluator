@@ -67,23 +67,16 @@ const limiter = rateLimit({
 
 app.use(limiter);
 
-// Validation schema for Help Scout webhook payload
+// Validation schema for Help Scout Dynamic Content API
+// Keep validation minimal - only require what's truly necessary
 const webhookSchema = Joi.object({
   ticket: Joi.object({
-    id: Joi.number().required(),
-    number: Joi.string().required(),
-    type: Joi.string().valid('email', 'phone', 'chat').required(),
-    tags: Joi.array().items(Joi.string()).optional()
-  }).required(),
-  customer: Joi.object({
-    id: Joi.number().optional(),
-    firstName: Joi.string().optional(),
-    lastName: Joi.string().optional(),
-    email: Joi.string().email().optional()
-  }).required(),
-  user: Joi.object().optional(),
-  mailbox: Joi.object().optional()
-}).unknown(true); // Allow additional fields from Help Scout
+    id: Joi.number().required()
+  }).unknown(true).required(), // ticket.id is the only required field
+  customer: Joi.object().unknown(true).optional(),
+  user: Joi.object().unknown(true).optional(),
+  mailbox: Joi.object().unknown(true).optional()
+}).unknown(true); // Allow all additional fields from Help Scout
 
 // Input validation middleware
 function validateWebhookPayload(req, res, next) {
