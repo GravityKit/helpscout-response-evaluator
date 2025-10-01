@@ -2,19 +2,33 @@
   "name": "helpscout-response-evaluator",
   "version": "1.0.0",
   "description": "Help Scout widget for evaluating support responses",
-  "main": "server-final.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node server-final.js",
-    "dev": "node server-final.js"
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
-    "express": "^4.18.2",
     "axios": "^1.6.0",
-    "dotenv": "^16.3.1",
     "cors": "^2.8.5",
-    "googleapis": "^126.0.1"
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.1.0",
+    "googleapis": "^126.0.1",
+    "he": "^1.2.0",
+    "joi": "^18.0.1",
+    "lru-cache": "^11.2.2",
+    "openai": "^6.0.1",
+    "winston": "^3.18.3",
+    "zod": "^4.1.11"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "jest": "^30.2.0",
+    "supertest": "^7.1.4"
   }
 }
